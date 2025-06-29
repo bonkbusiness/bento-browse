@@ -488,14 +488,16 @@ export default function App() {
           </Page>
         </div>
         {/* ProductCard Popup */}
-        {selectedProduct && (
-          <ProductCard
-            product={selectedProduct}
-            allProducts={products}
-            onClose={() => setSelectedProduct(null)}
-            darkMode={darkMode}
-          />
-        )}
+        <ProductCard
+  product={selectedProduct}
+  allProducts={products}
+  onClose={() => setSelectedProduct(null)}
+  darkMode={darkMode}
+  onProductSelect={rel => {
+    const match = products.find(p => p["Artikelnummer"] === rel["Artikelnummer"]);
+    setSelectedProduct(match || rel);
+  }}
+/>
       </AppProvider>
     </div>
   );

@@ -2,16 +2,7 @@
  * ProductCard.jsx
  *
  * Table.se Product details popup card.
- *
- * Features:
- * - Two-column layout: left for prices, right for all other datapoints (excl. Artikelnummer).
- * - Units are shown as text after the value.
- * - "Beskrivning" is in its own section.
- * - "Pris" and "moms" are stripped from price labels.
- * - Clicking/tapping on the product image opens a full-size overlay with the highest available resolution (try srcset or replace _small/_thumb with _large), tap again to close.
- * - Related products: Clicking/tapping a related product updates the card (calls onProductSelect if provided).
- * - Related products are always centered with equal left/right padding for a unified look.
- * - Only valid Phosphor-react icons are used.
+ * See README for feature list.
  */
 
 import React, { useState } from "react";
@@ -65,25 +56,20 @@ const OTHER_MEASUREMENTS = [
   "Längd", "Bredd", "Höjd", "Djup", "Diameter", "Kapacitet", "Volym", "Vikt"
 ];
 
-// Exclude "Artikelnummer" from right column as it's shown under the product name.
 const BASIC_FIELDS = [
   ["Färg", "Färg"],
   ["Material", "Material"],
   ["Serie", "Serie"],
   ["Kategori (parent)", "Kategori (parent)"],
   ["Kategori (sub)", "Kategori (sub)"],
-  // "Beskrivning" gets its own space below
 ];
 
 function stripPriceLabel(label) {
-  // Removes 'Pris', 'moms', and trims
   return label.replace(/pris/gi, "").replace(/moms/gi, "").replace(/\(\s*\)/g, "").replace(/\s+/g, " ").trim() || label;
 }
 
-// Utility to try to get higher-res image URL if possible
 function getHighResImage(url) {
   if (!url) return url;
-  // Try common patterns: replace _small, _thumb, _medium, -150x150 with empty or _large
   let highRes = url
     .replace(/(_small|_thumb|_medium)/gi, "")
     .replace(/(-\d+x\d+)(\.\w+)$/, "$2")
@@ -99,7 +85,7 @@ export default function ProductCard({
   allProducts,
   onClose,
   darkMode,
-  onProductSelect // (product: object) => void, for related products
+  onProductSelect
 }) {
   const [imagePopup, setImagePopup] = useState(false);
 
@@ -107,6 +93,7 @@ export default function ProductCard({
 
   const sku = String(product["Artikelnummer"] || "");
   const subcat = product["Kategori (sub)"] || "";
+
   const relevant = allProducts.filter(p => {
     const psku = String(p["Artikelnummer"] || "");
     return (
@@ -141,7 +128,6 @@ export default function ProductCard({
     border: darkMode ? "1px solid #444" : "1px solid #e0e0e0"
   };
 
-  // Render a field row for the grid (unit as text)
   function renderGridField(icon, label, value, enhet) {
     if (!value) return null;
     return (
@@ -175,9 +161,7 @@ export default function ProductCard({
     );
   }
 
-  // Build grid columns for price (left) and all other datapoints (right)
   function buildColumns() {
-    // Left column: Prices (with "pris"/"moms" removed)
     const leftColumn = [];
     PRICE_FIELDS.forEach(([valKey, enhetKey, label]) => {
       const value = product[valKey];
@@ -191,7 +175,6 @@ export default function ProductCard({
       }
     });
 
-    // Right column: Article info and measurements (skip Artikelnummer)
     const rightColumn = [];
     BASIC_FIELDS.forEach(([label, key]) => {
       const value = product[key];
@@ -220,7 +203,6 @@ export default function ProductCard({
 
   const [leftColumn, rightColumn] = buildColumns();
 
-  // --- Image Popup Overlay ---
   const imagePopupStyle = {
     position: "fixed",
     top: 0, left: 0, width: "100vw", height: "100vh",
@@ -232,7 +214,6 @@ export default function ProductCard({
     cursor: "zoom-out"
   };
 
-  // Centered related products container
   const relatedProductsContainerStyle = {
     display: "flex",
     flexWrap: "wrap",
@@ -382,7 +363,11 @@ export default function ProductCard({
                     transition: "box-shadow 0.2s",
                     boxShadow: "none",
                   }}
-                  onClick={() => onProductSelect && onProductSelect(rel)}
+                  onClick={() => {
+                    // Always pick from the main products array to ensure fresh object
+                    const match = allProducts.find(p => p["Artikelnummer"] === rel["Artikelnummer"]);
+                    if (onProductSelect) onProductSelect(match || rel);
+                  }}
                   tabIndex={0}
                   role="button"
                   aria-label={`Visa ${rel["Namn"]}`}
