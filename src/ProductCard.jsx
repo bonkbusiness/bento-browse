@@ -1,11 +1,15 @@
 /**
  * ProductCard.jsx
  *
- * Table.se Product details popup card.
- * See README for feature list.
+ * Product details popup card, mobile-first.
+ * - Title (Namn) is uppercase, single-line, ellipsis, never exceeds card border-radius or width.
+ * - Serie and Färg are in a full-width block below the grid, word-wrapped, no fixed height.
+ * - All values are compact and responsive.
+ * - Image popup always loads the highest available resolution.
+ * - Card is mobile-friendly (max-width: 570px, width: 99vw, padding, border-radius).
  */
 
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import {
   TagChevron,
   Cube,
@@ -27,9 +31,9 @@ import {
 // --- Icon mapping for product fields ---
 const FIELD_ICONS = {
   "Namn": <TagChevron size={18} />,
+  "Serie": <ArchiveBox size={18} />,
   "Färg": <Palette size={18} />,
   "Material": <Sparkle size={18} />,
-  "Serie": <ArchiveBox size={18} />,
   "Exkl.": <Coins size={18} />,
   "Inkl.": <Coins size={18} />,
   "Längd": <Ruler size={18} />,
@@ -56,10 +60,9 @@ const OTHER_MEASUREMENTS = [
   "Längd", "Bredd", "Höjd", "Djup", "Diameter", "Kapacitet", "Volym", "Vikt"
 ];
 
+// Serie and Färg are NOT in the column structure
 const BASIC_FIELDS = [
-  ["Färg", "Färg"],
   ["Material", "Material"],
-  ["Serie", "Serie"],
   ["Kategori (parent)", "Kategori (parent)"],
   ["Kategori (sub)", "Kategori (sub)"],
 ];
@@ -87,13 +90,30 @@ export default function ProductCard({
   darkMode,
   onProductSelect
 }) {
+  // All hooks at top
   const [imagePopup, setImagePopup] = useState(false);
+  const titleRef = useRef(null);
+  const gridContainerRef = useRef(null);
+  const [gridWidth, setGridWidth] = useState(340);
+
+  useEffect(() => {
+    if (gridContainerRef.current) {
+      setGridWidth(gridContainerRef.current.offsetWidth || 340);
+    }
+    // Update on window resize for mobile
+    function handleResize() {
+      if (gridContainerRef.current) {
+        setGridWidth(gridContainerRef.current.offsetWidth || 340);
+      }
+    }
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, [product, gridContainerRef.current]);
 
   if (!product) return null;
 
   const sku = String(product["Artikelnummer"] || "");
   const subcat = product["Kategori (sub)"] || "";
-
   const relevant = allProducts.filter(p => {
     const psku = String(p["Artikelnummer"] || "");
     return (
@@ -106,6 +126,7 @@ export default function ProductCard({
     );
   }).slice(0, 6);
 
+  // --- Styles ---
   const overlayStyle = {
     position: "fixed",
     top: 0, left: 0, width: "100vw", height: "100vh",
@@ -120,12 +141,22 @@ export default function ProductCard({
     background: darkMode ? "#232426" : "#fff",
     borderRadius: 12,
     maxWidth: 570,
-    width: "95vw",
-    padding: 28,
+    width: "99vw",
+    padding: 20,
     boxShadow: "0 4px 32px #0003",
     position: "relative",
     color: darkMode ? "#f6f6f6" : "#18191a",
     border: darkMode ? "1px solid #444" : "1px solid #e0e0e0"
+  };
+
+  // Responsive: for grid and title, never overflow the card
+  const responsiveGridStyle = {
+    display: "grid",
+    gridTemplateColumns: "1fr 1fr",
+    gap: "0 12px",
+    marginBottom: 10,
+    width: "100%",
+    boxSizing: "border-box"
   };
 
   function renderGridField(icon, label, value, enhet) {
@@ -145,23 +176,55 @@ export default function ProductCard({
         <span style={{
           fontWeight: 500,
           fontSize: 15,
-          minWidth: 70,
           color: darkMode ? "#f6f6f6" : "#333",
-          flexShrink: 0
+          flexShrink: 0,
+          minWidth: 46,
+          maxWidth: 80,
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+          whiteSpace: "nowrap"
         }}>{label}</span>
-        <span style={{ fontWeight: 600, fontSize: 15, color: darkMode ? "#fff" : "#222", flexShrink: 0 }}>
-          {value}
-        </span>
-        {enhet && (
-          <span style={{ marginLeft: 3, color: darkMode ? "#FFD600" : "#1976d2", fontSize: 15 }}>
-            {enhet}
+        <span style={{
+          display: "flex",
+          alignItems: "center",
+          flex: 1,
+          minWidth: 0,
+          justifyContent: "flex-end"
+        }}>
+          <span style={{
+            fontWeight: 600,
+            fontSize: 15,
+            color: darkMode ? "#fff" : "#222",
+            textAlign: "right",
+            whiteSpace: "nowrap",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            maxWidth: 72,
+          }}>
+            {value}
           </span>
-        )}
+          {enhet && (
+            <span style={{
+              marginLeft: 4,
+              color: darkMode ? "#FFD600" : "#1976d2",
+              fontSize: 15,
+              minWidth: 16,
+              maxWidth: 36,
+              textAlign: "left",
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+            }}>
+              {enhet}
+            </span>
+          )}
+        </span>
       </div>
     );
   }
 
   function buildColumns() {
+    // Left column: Prices
     const leftColumn = [];
     PRICE_FIELDS.forEach(([valKey, enhetKey, label]) => {
       const value = product[valKey];
@@ -175,6 +238,7 @@ export default function ProductCard({
       }
     });
 
+    // Right column: Article info and measurements (skip Artikelnummer, Serie, Färg)
     const rightColumn = [];
     BASIC_FIELDS.forEach(([label, key]) => {
       const value = product[key];
@@ -203,6 +267,7 @@ export default function ProductCard({
 
   const [leftColumn, rightColumn] = buildColumns();
 
+  // --- Image Popup Overlay ---
   const imagePopupStyle = {
     position: "fixed",
     top: 0, left: 0, width: "100vw", height: "100vh",
@@ -214,6 +279,7 @@ export default function ProductCard({
     cursor: "zoom-out"
   };
 
+  // Centered related products container
   const relatedProductsContainerStyle = {
     display: "flex",
     flexWrap: "wrap",
@@ -224,8 +290,10 @@ export default function ProductCard({
     paddingRight: 0,
   };
 
+  // --- Render ---
   return (
     <>
+      {/* Image popup overlay, always tries high-res */}
       {imagePopup && product["Produktbild-URL"] && (
         <div
           style={imagePopupStyle}
@@ -247,7 +315,8 @@ export default function ProductCard({
               objectFit: "contain",
               display: "block",
             }}
-            onClick={() => setImagePopup(false)}
+            onClick={e => { e.stopPropagation(); setImagePopup(false); }}
+            onLoad={e => { e.target.style.opacity = 1; }}
           />
         </div>
       )}
@@ -268,18 +337,19 @@ export default function ProductCard({
             aria-label="Stäng"
           >×</button>
           {/* Header with image and name */}
-          <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 18 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
             {product["Produktbild-URL"] ? (
               <img
                 src={product["Produktbild-URL"]}
                 alt={product["Namn"]}
                 style={{
-                  width: 70,
-                  height: 70,
+                  width: 60,
+                  height: 60,
                   objectFit: "contain",
                   borderRadius: 8,
                   background: darkMode ? "#18191a" : "#f8f8f8",
-                  cursor: "zoom-in"
+                  cursor: "zoom-in",
+                  flexShrink: 0
                 }}
                 onClick={() => setImagePopup(true)}
                 tabIndex={0}
@@ -287,33 +357,125 @@ export default function ProductCard({
                 aria-label="Visa större bild"
               />
             ) : (
-              <ImageSquare size={58} color={darkMode ? "#FFD600" : "#888"} />
+              <ImageSquare size={50} color={darkMode ? "#FFD600" : "#888"} />
             )}
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 21, fontWeight: 700, marginBottom: 2, lineHeight: 1.15 }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div
+                ref={titleRef}
+                style={{
+                  fontSize: 19,
+                  fontWeight: 700,
+                  marginBottom: 2,
+                  lineHeight: 1.18,
+                  whiteSpace: "nowrap",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  textTransform: "uppercase",
+                  maxWidth: gridWidth ? gridWidth - 24 : 260, // leave room for padding
+                  // Responsive: never exceed card width (border-radius)
+                  transition: "max-width 0.2s",
+                }}
+                title={product["Namn"]}
+              >
                 {product["Namn"]}
               </div>
-              <div style={{ color: "#ff7e1b", fontWeight: 600, fontSize: 15 }}>
+              <div style={{ color: "#ff7e1b", fontWeight: 600, fontSize: 13 }}>
                 {sku}
               </div>
             </div>
           </div>
           {/* Two-column grid for datapoints */}
-          <div style={{
-            display: "grid",
-            gridTemplateColumns: "1fr 1fr",
-            gap: "0 26px",
-            marginBottom: 12,
-          }}>
+          <div
+            ref={gridContainerRef}
+            style={responsiveGridStyle}>
             <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>{leftColumn}</div>
             <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>{rightColumn}</div>
           </div>
+          {/* Serie + Färg as a full-width block, word-wrap, no height restriction */}
+          {(product["Serie"] || product["Färg"]) && (
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: 2,
+                margin: "8px 0 6px 0",
+                padding: "8px 8px",
+                width: "100%",
+                borderRadius: 8,
+                background: darkMode ? "#1d1d1e" : "#f7f7fa",
+                border: darkMode ? "1px solid #333" : "1px solid #e0e0e0",
+              }}
+            >
+              {/* Serie */}
+              {product["Serie"] && (
+                <div style={{ display: "flex", alignItems: "flex-start", gap: 8, width: "100%" }}>
+                  <span
+                    style={{
+                      minWidth: 22, display: "flex", justifyContent: "center", marginTop: 3
+                    }}>{FIELD_ICONS["Serie"]}</span>
+                  <span style={{
+                    fontWeight: 500,
+                    fontSize: 15,
+                    color: darkMode ? "#FFD600" : "#222",
+                    flexShrink: 0,
+                    minWidth: 52,
+                    maxWidth: 90,
+                    marginTop: 3,
+                    marginRight: 8
+                  }}>Serie</span>
+                  <span style={{
+                    fontWeight: 600,
+                    fontSize: 15,
+                    color: darkMode ? "#fff" : "#222",
+                    display: "block",
+                    lineHeight: "22px",
+                    width: "100%",
+                    wordBreak: "break-word",
+                    whiteSpace: "pre-line",
+                  }}>
+                    {product["Serie"]}
+                  </span>
+                </div>
+              )}
+              {/* Färg */}
+              {product["Färg"] && (
+                <div style={{ display: "flex", alignItems: "flex-start", gap: 8, width: "100%" }}>
+                  <span
+                    style={{
+                      minWidth: 22, display: "flex", justifyContent: "center", marginTop: 3
+                    }}>{FIELD_ICONS["Färg"]}</span>
+                  <span style={{
+                    fontWeight: 500,
+                    fontSize: 15,
+                    color: darkMode ? "#FFD600" : "#222",
+                    flexShrink: 0,
+                    minWidth: 52,
+                    maxWidth: 90,
+                    marginTop: 3,
+                    marginRight: 8
+                  }}>Färg</span>
+                  <span style={{
+                    fontWeight: 600,
+                    fontSize: 15,
+                    color: darkMode ? "#fff" : "#222",
+                    display: "block",
+                    lineHeight: "22px",
+                    width: "100%",
+                    wordBreak: "break-word",
+                    whiteSpace: "pre-line",
+                  }}>
+                    {product["Färg"]}
+                  </span>
+                </div>
+              )}
+            </div>
+          )}
           {/* Beskrivning in its own space */}
           {product["Beskrivning"] && (
             <div
               style={{
-                margin: "16px 0 10px 0",
-                padding: "12px 12px",
+                margin: "14px 0 8px 0",
+                padding: "10px 10px",
                 background: darkMode ? "#191a1a" : "#f6f7fa",
                 borderRadius: 8,
                 fontSize: 15,
@@ -338,13 +500,14 @@ export default function ProductCard({
                 display: "inline-block",
                 color: "#1976d2",
                 textDecoration: "underline",
-                marginBottom: 16
+                marginBottom: 12,
+                fontSize: 15
               }}
             >
               Visa på Table.se
             </a>
           )}
-          <hr style={{ margin: "18px 0", borderColor: darkMode ? "#333" : "#eee" }} />
+          <hr style={{ margin: "16px 0", borderColor: darkMode ? "#333" : "#eee" }} />
           <div>
             <strong>Relaterade produkter</strong>
             <div style={relatedProductsContainerStyle}>
@@ -355,7 +518,7 @@ export default function ProductCard({
                 <div
                   key={rel["Artikelnummer"]}
                   style={{
-                    width: 90,
+                    width: 78,
                     textAlign: "center",
                     cursor: "pointer",
                     outline: "none",
@@ -364,7 +527,6 @@ export default function ProductCard({
                     boxShadow: "none",
                   }}
                   onClick={() => {
-                    // Always pick from the main products array to ensure fresh object
                     const match = allProducts.find(p => p["Artikelnummer"] === rel["Artikelnummer"]);
                     if (onProductSelect) onProductSelect(match || rel);
                   }}
@@ -377,8 +539,8 @@ export default function ProductCard({
                       src={rel["Produktbild-URL"]}
                       alt={rel["Namn"]}
                       style={{
-                        width: 72,
-                        height: 72,
+                        width: 60,
+                        height: 60,
                         objectFit: "contain",
                         borderRadius: 6,
                         background: darkMode ? "#18191a" : "#f8f8f8"

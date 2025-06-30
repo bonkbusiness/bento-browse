@@ -23,11 +23,7 @@ export default function YouTubeHeader({
 
   useEffect(() => {
     function handleResize() {
-      if (window.innerWidth > 560) {
-        setShowSearch(true);
-      } else {
-        setShowSearch(false);
-      }
+      setShowSearch(window.innerWidth > 560);
     }
     window.addEventListener("resize", handleResize);
     handleResize();
@@ -81,8 +77,8 @@ export default function YouTubeHeader({
               flex: 1 1 0 !important;
             }
             .header-actions {
-              gap: 10px !important;
-              margin-left: 6px !important;
+              gap: 12px !important;
+              margin-left: 8px !important;
             }
             .header-search-icon {
               font-size: 22px !important;
@@ -196,15 +192,25 @@ export default function YouTubeHeader({
           </div>
         </form>
       )}
-      <div className="header-actions" style={{ display: "flex", alignItems: "center", gap: 18, marginLeft: 18 }}>
-        <span
+      <div
+        className="header-actions"
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 16, // Ensures even spacing between icons
+          marginLeft: 16,
+        }}
+      >
+        <button
           className="header-upload"
+          type="button"
           style={iconButtonStyle}
           title="Upload"
           onClick={onUpload}
+          aria-label="Ladda upp"
         >
           <UploadSimple size={ICON_SIZE} weight="duotone" />
-        </span>
+        </button>
         <button
           className="header-dark"
           type="button"
@@ -216,6 +222,7 @@ export default function YouTubeHeader({
             border: "none"
           }}
           title="Växla dag/natt"
+          aria-label="Växla dag/natt"
         >
           {darkMode
             ? <Sun size={20} weight="duotone" />

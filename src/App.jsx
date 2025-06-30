@@ -1,3 +1,39 @@
+/**
+ * App.jsx
+ *
+ * Main entry point for the Bento Browse React application.
+ *
+ * Features:
+ * - Shopify Polaris-based UI with dark mode support
+ * - Product CSV import and search/filtering
+ * - Inline product list with click-to-view ProductCard popup
+ * - Smart fuzzy searching (by name, SKU, or category)
+ * - Success/warning/error messaging for uploads
+ * - Responsive, accessible design
+ *
+ * Component structure:
+ * - AppProvider (Polaris theme + i18n)
+ *   - YouTubeHeader (search box, dark mode toggle, upload button)
+ *   - Page
+ *     - CsvImport (file input & parsing)
+ *     - Spinner (loading state)
+ *     - Success/Warning/Error banners
+ *     - Product list (as clickable rows)
+ *     - ProductCard (popup overlay for product details and switching between related products)
+ *
+ * State Management:
+ * - search: current search string
+ * - products: array of all parsed products
+ * - darkMode: theme toggle
+ * - selectedProduct: product for ProductCard popup
+ * - uploadInProgress/showResults: spinner state
+ * - showSuccess, warningMessage, errorMessage: upload/parse messaging
+ *
+ * Styling:
+ * - Custom Polaris overrides for background/theme, both light and dark
+ * - Responsive, accessible inline styles
+ */
+
 import React, { useState, useEffect, useRef } from "react";
 import {
   AppProvider,
@@ -10,9 +46,12 @@ import CsvImport from "./CsvImport.jsx";
 import { tableSeLightTheme, tableSeDarkTheme } from "./theme.js";
 import YouTubeHeader from "./YouTubeHeader.jsx";
 import { ImageSquare } from "phosphor-react";
-import ProductCard from "./ProductCard.jsx"; // <-- Make sure to create this!
+import ProductCard from "./ProductCard.jsx";
 
-// Custom override for Polaris backgrounds
+/**
+ * Custom hook: Applies global CSS overrides for Polaris backgrounds and shadows.
+ * Ensures theme coloring consistency beyond what Polaris exposes.
+ */
 function usePolarisCustomOverrides(darkMode, dark, light) {
   useEffect(() => {
     const styleId = "polaris-global-overrides";
@@ -48,26 +87,25 @@ function usePolarisCustomOverrides(darkMode, dark, light) {
 }
 
 export default function App() {
+  // State: search query, products, theme, popup, spinner, and upload banners
   const [search, setSearch] = useState("");
   const [products, setProducts] = useState([]);
   const [darkMode, setDarkMode] = useState(false);
 
-  // Success & error/warning state
+  // Upload banners and spinner state
   const [showSuccess, setShowSuccess] = useState(false);
   const [successTrigger, setSuccessTrigger] = useState(0);
   const [warningMessage, setWarningMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
-
-  // Spinner & upload state
   const [uploadInProgress, setUploadInProgress] = useState(false);
   const [showResults, setShowResults] = useState(false);
   const spinnerTimeoutRef = useRef();
-  const SPINNER_MIN_DURATION = 900; // ms
+  const SPINNER_MIN_DURATION = 900;
 
-  // ProductCard popup state
+  // Product details popup
   const [selectedProduct, setSelectedProduct] = useState(null);
 
-  // --- COLOR CONSTANTS ---
+  // Theme color constants
   const COLOR_LIGHT_BG = "#fff";
   const COLOR_DARK_BG = "#18191a";
   const COLOR_LIGHT_CARD = "#fff";
@@ -82,20 +120,27 @@ export default function App() {
   const COLOR_DARK_ICON_BG = "#232426";
   const tableSeOrange = "#ff7e1b";
 
-  // --- SIZES ---
+  // Sizing constants
   const HEADER_HEIGHT = 56;
   const ICON_SIZE = 22;
 
+  // Apply custom Polaris theme overrides
   usePolarisCustomOverrides(darkMode, COLOR_DARK_BG, COLOR_LIGHT_BG);
 
-  // Handle new upload: spinner must always show at least SPINNER_MIN_DURATION ms
+  /**
+   * Triggered when a CSV upload starts.
+   * Shows spinner and hides results.
+   */
   const handleUploadStart = () => {
     setUploadInProgress(true);
     setShowResults(false);
     if (spinnerTimeoutRef.current) clearTimeout(spinnerTimeoutRef.current);
   };
 
-  // Called by CsvImport when upload is done
+  /**
+   * Called by CsvImport when CSV parsing is done.
+   * Ensures spinner is visible for at least SPINNER_MIN_DURATION ms.
+   */
   const handleCsvData = (rows) => {
     spinnerTimeoutRef.current = setTimeout(() => {
       setProducts(rows);
@@ -104,10 +149,14 @@ export default function App() {
     }, SPINNER_MIN_DURATION);
   };
 
+  /**
+   * Trigger success banner when all required columns are present.
+   */
   function onAllRequiredColumnsPresent() {
     setSuccessTrigger(Date.now());
   }
 
+  // Auto-hide success banner after 3s (unless warning/error is shown)
   useEffect(() => {
     if (successTrigger === 0) return;
     setShowSuccess(true);
@@ -119,12 +168,16 @@ export default function App() {
     return () => clearTimeout(timer);
   }, [successTrigger, warningMessage, errorMessage]);
 
+  // Hide success if warning or error appears
   useEffect(() => {
     if ((warningMessage || errorMessage) && showSuccess) {
       setShowSuccess(false);
     }
   }, [warningMessage, errorMessage, showSuccess]);
 
+  /**
+   * Normalizes strings for search: lowercase, removes accents, replaces non-alphanum with space.
+   */
   function normalize(str) {
     return String(str || "")
       .toLowerCase()
@@ -135,10 +188,16 @@ export default function App() {
       .trim();
   }
 
+  /**
+   * Heuristic: Detect whether user is searching by SKU or by product name.
+   */
   function isLikelySku(q) {
     return /\d/.test(q) || (/^[\w\-]+$/.test(q) && q.length < 10);
   }
 
+  /**
+   * Compute a relevancy score for a match (for fuzzy search).
+   */
   function getRelevancy(p, q, mode) {
     const name = normalize(p["Namn"]);
     const sku = normalize(p["Artikelnummer"]);
@@ -158,6 +217,9 @@ export default function App() {
     return 0;
   }
 
+  /**
+   * Memoized filtered & sorted product list based on search.
+   */
   const filtered = React.useMemo(() => {
     if (!search) return products;
     const qWords = normalize(search).split(" ").filter(Boolean);
@@ -177,12 +239,15 @@ export default function App() {
       .sort((a, b) => b._score - a._score);
   }, [products, search]);
 
+  /**
+   * Triggers the hidden file input for CSV upload.
+   */
   function handleUploadClick() {
     const el = document.getElementById("csv-input");
     if (el) el.click();
   }
 
-  // Uniform icon wrapper for list and empty states
+  // Uniform icon wrapper for product list and empty state
   const iconButtonStyle = {
     width: 36,
     height: 36,
@@ -196,16 +261,16 @@ export default function App() {
     cursor: "pointer"
   };
 
-  // Only show "Inga produkter matchar din sökning" if a file is uploaded (products.length > 0)
+  // Only show "Inga produkter matchar din sökning" if a file is uploaded
   const hasFileUploaded = products.length > 0;
 
-  // Only show main content if not uploading, or upload spinner has shown for the minimum duration
+  // Show main content if not uploading, or after upload spinner is done
   const shouldShowContent =
     (!uploadInProgress && showResults) ||
     (!uploadInProgress && products.length === 0);
 
+  // Cleanup spinner timeout on unmount
   useEffect(() => {
-    // Clean up the spinner timeout on unmount
     return () => {
       if (spinnerTimeoutRef.current) clearTimeout(spinnerTimeoutRef.current);
     };
@@ -489,15 +554,16 @@ export default function App() {
         </div>
         {/* ProductCard Popup */}
         <ProductCard
-  product={selectedProduct}
-  allProducts={products}
-  onClose={() => setSelectedProduct(null)}
-  darkMode={darkMode}
-  onProductSelect={rel => {
-    const match = products.find(p => p["Artikelnummer"] === rel["Artikelnummer"]);
-    setSelectedProduct(match || rel);
-  }}
-/>
+          product={selectedProduct}
+          allProducts={products}
+          onClose={() => setSelectedProduct(null)}
+          darkMode={darkMode}
+          onProductSelect={rel => {
+            // Always pick from products list for correct object identity
+            const match = products.find(p => p["Artikelnummer"] === rel["Artikelnummer"]);
+            setSelectedProduct(match || rel);
+          }}
+        />
       </AppProvider>
     </div>
   );
